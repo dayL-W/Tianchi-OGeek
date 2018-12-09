@@ -19,7 +19,7 @@ class PrefixProcess(object):
     @staticmethod
     def _prefix_in_title(item):
         '''
-        计算prefix 是否在 title中
+        计算prefix 是否在 title中，是的话返回重合的比例
         '''
         prefix = item['prefix']
         title = item['title']
@@ -32,7 +32,7 @@ class PrefixProcess(object):
     @staticmethod
     def _levenshtein_distance(item):
         '''
-        计算莱文斯坦距离，即编辑距离
+        计算prefix和title的莱文斯坦距离，即编辑距离
         '''
         str1 = item['prefix']
         str2 = item['title']
@@ -61,6 +61,9 @@ class PrefixProcess(object):
         return matrix[x_size - 1, y_size - 1]
     @staticmethod
     def _distince_rate(item):
+        '''
+        计算prefix和title的距离比例,即距离/长度
+        '''
         str1 = item["prefix"]
         str2 = item["title"]
         leven_distance = item["levenshtein_distance"]
@@ -71,24 +74,10 @@ class PrefixProcess(object):
         length = max(len(str1), len(str2))
 
         return leven_distance / (length + 5)  # 平滑
-    
-#     def _get_prefix_w2v(self):
-
-#         prefix_w2v_list = list()
-#         for idx, prefix in self.prefix_w2v_df.iterrows():
-#             if not prefix[0]:
-#                 prefix_w2v_list.append(None)
-#                 continue
-
-#             title = self.title_w2v_df.loc[idx]
-#             if not title[0]:
-#                 prefix_w2v_list.append(None)
-#                 continue
-
-#             similar = np.dot(prefix, title)
-#             prefix_w2v_list.append(similar)
-#         return prefix_w2v_list
     def _get_prefix_w2v(self,item):
+        '''
+        计算prefix和title词向量之间的相似度
+        '''
         index = item.name
         prefix = self.prefix_w2v_df.loc[index]
         title = self.title_w2v_df.loc[index]
@@ -97,7 +86,9 @@ class PrefixProcess(object):
         return num / denom
     @staticmethod
     def _get_rp_prefix_in_title(item):
-        """计算title对prefix的词、字级别的召回率、精确率"""
+        '''
+        计算title对prefix的分词之后的召回率、精确率
+        '''
         prefix = item['prefix']
         title = item['title']
         
@@ -112,6 +103,9 @@ class PrefixProcess(object):
         acc = len_comm_xx / (len_title + len_prefix - len_comm_xx + 0.01)
         return [recall,precision,acc]
     def get_prefix_feat(self, df):
+        '''
+        得到所有和prefix相关的特征并保存起来
+        '''
         prefix_df = pd.DataFrame()
         prefix_df = df[['prefix','title']].copy()
             
@@ -146,13 +140,12 @@ class PrefixProcess(object):
             prefix3_df = pd.read_csv('./cache/prefix_3.csv',index_col=0)
             prefix_df = pd.concat([prefix3_df,prefix_df],axis=1)
 
+        #计算prefix和title的字符串长度
         prefix_df['len_prefix' ] = prefix_df.prefix.apply(lambda x:len(x))
         prefix_df['len_title' ] = prefix_df.title.apply(lambda x:len(x))
         save_columns = ['prefix_in_title','levenshtein_distance','distince_rate','prefix_w2v_title',\
                             'prefix_t_recall_word','prefix_t_precision_word','prefix_t_acc_word','len_prefix','len_title']
 
-#         for col in save_columns:
-#             prefix_df[col].fillna(prefix_df[col].mean(), inplace=True)
         save_df = prefix_df[save_columns]
             
         return save_df
@@ -163,7 +156,7 @@ class QueryProcess(object):
     @staticmethod
     def _get_query_prediction(item):
         '''
-        计算title在query_prediction中的概率
+        如果title在query中返回它对于的概率
         '''
         query = item['query_prediction']
         title = item['title']
@@ -174,7 +167,7 @@ class QueryProcess(object):
     @staticmethod
     def _get_title_in_query(item):
         '''
-        计算title在query_prediction中的概率
+        title是否在query中
         '''
         query = item['query_prediction']
         title = item['title']
@@ -183,6 +176,9 @@ class QueryProcess(object):
         return 0
     
     def _get_jieba_array(self, words, size=300):
+        '''
+        对输入的word做结巴分词后获取对于的词向量，取平均后作为words的向量
+        '''
         seg_cut = jieba.lcut(words)
         seg_cut = char_list_cheaner(seg_cut)
 
@@ -202,6 +198,10 @@ class QueryProcess(object):
         return w2v_array
     
     def _get_w2v_similar(self, item):
+        '''
+        对title和query中的每一个短语计算它们之间的相似度，并
+        返回最大值、平均值和加权值
+        '''
         item_dict = dict()
 
         query_predict = item["query_prediction"]
@@ -247,6 +247,9 @@ class QueryProcess(object):
         return item_dict
     @staticmethod
     def LCS(str1, str2):
+        '''
+        计算str1和str2之间的最长公共子串的长度
+        '''
         if str1 == '' or str2 == '':
             return 0
         len1 = len(str1)
@@ -265,6 +268,10 @@ class QueryProcess(object):
         return max_len
 
     def _get_lcs_query(self, item):
+        '''
+        对title和query中的每一个短语计算最长公共子串的长度，并
+        返回最大值、平均值和加权值
+        '''
         query_predict = item["query_prediction"]
         title = item["title"]
         item_dict = dict()
@@ -304,7 +311,7 @@ class QueryProcess(object):
     @staticmethod
     def _levenshtein_distance(str1, str2):
         '''
-        计算莱文斯坦距离，即编辑距离
+        计算str1和str2之间的莱文斯坦距离，即编辑距离
         '''
 
         if not isinstance(str1, str):
@@ -330,6 +337,10 @@ class QueryProcess(object):
 
         return matrix[x_size - 1, y_size - 1]
     def _get_leven_query(self, item):
+        '''
+        对title和query中的每一个短语计算编辑距离，并
+        返回最大值、平均值和加权值
+        '''
         query_predict = item["query_prediction"]
         title = item["title"]
         item_dict = dict()
@@ -370,6 +381,9 @@ class QueryProcess(object):
 
         return item_dict
     def get_query_df(self, df):
+        '''
+        获取和query相关的所有特征
+        '''
         query_df = pd.DataFrame()
         
         if not os.path.exists('./cache/query_1.csv'):
@@ -380,18 +394,6 @@ class QueryProcess(object):
         else:
             query1_df = pd.read_csv('./cache/query_1.csv', index_col=0)
             query_df = pd.concat([query_df,query1_df],axis=1)
-        
-#         if not os.path.exists('./cache/query_2.csv'):
-#             query_df["w2c_item_dict"] = df.apply(self._get_w2v_similar, axis=1)
-#             query_df["w2c_max_similar"] = query_df["w2c_item_dict"].apply(lambda item: item.get("max_similar"))
-#             query_df["w2c_mean_similar"] = query_df["w2c_item_dict"].apply(lambda item: item.get("mean_similar"))
-#             query_df["w2c_weight_similar"] = query_df["w2c_item_dict"].apply(lambda item: item.get("weight_similar"))
-#             query_df = query_df.drop(columns=["w2c_item_dict"])
-#             save_columns = ['w2c_max_similar','w2c_mean_similar','w2c_weight_similar']
-#             query_df[save_columns].to_csv('./cache/query_2.csv')
-#         else:
-#             query2_df = pd.read_csv('./cache/query_2.csv', index_col=0)
-#             query_df = pd.concat([query_df,query2_df],axis=1)
         
         if not os.path.exists('./cache/query_3.csv'):
             query_df["lcs_item_dict"] = df.apply(self._get_lcs_query, axis=1)
@@ -416,21 +418,21 @@ class QueryProcess(object):
         else:
             query4_df = pd.read_csv('./cache/query_4.csv', index_col=0)
             query_df = pd.concat([query_df,query4_df],axis=1)
-        
+        #计算query中候选词的个数
         query_df['len_query' ] = df.query_prediction.apply(lambda x:len(x) if x!= None else 0)
-#         save_columns = ['query_prediction_prob','lcs_max_rate','lcs_mean_rate','lcs_weight_rate','title_in_query',\
-#                        'leven_min','leven_rate_mean','leven_rate_weight','w2c_max_similar','w2c_mean_similar',\
-#                        'w2c_weight_similar','len_query']
+
         save_columns = ['query_prediction_prob','title_in_query','w2c_max_similar','w2c_mean_similar','w2c_weight_similar',\
                        'lcs_max_rate','lcs_mean_rate','lcs_weight_rate','leven_min','leven_rate_mean','leven_rate_weight','len_query']
-#         for col in save_columns:
-#             query_df[col].fillna(query_df[col].mean(), inplace=True)
 
         return query_df
 
 class Process(object):
     
     def __init__(self):
+        '''
+        读取词向量文件，如果没有的话可以运行w2v.py得到，并把文件名修改成对应的
+        名称，比如'train.bin'
+        '''
         if not os.path.exists('./cache/w2c_model.pkl'):
             file_name = './DataSets/merge_sgns_bigram_char300/merge_sgns_bigram_char300.txt'
             self.w2v_model = KeyedVectors.load_word2vec_format(file_name, unicode_errors="ignore")
@@ -441,6 +443,9 @@ class Process(object):
                 self.w2v_model = pickle.load(f_t)
     @staticmethod
     def _get_data(name):
+        '''
+        读取数据
+        '''
         file_name = './DataSets/oppo_data_ronud2_20181107/data_{}.txt'.format(name)
         if name == 'test':
             columns=['prefix','query_prediction','title','tag']
@@ -459,18 +464,18 @@ class Process(object):
         
         if name == 'test':
             df['label'] = -1
-        
+        #进行字符串的清洗
         df['label'] = df['label'].apply(lambda x: int(x))
         df["prefix"] = df["prefix"].apply(char_cleaner)
         df["title"] = df["title"].apply(char_cleaner)
-#         if name == 'train':
-#             df.drop(df.loc[df.prefix==''].index, axis=0,inplace=True)
-#             df.drop(df.loc[df.title==''].index, axis=0,inplace=True)
         
         df["query_prediction"] = df["query_prediction"].apply(lambda x: json.loads(x) if x != '' else None)
         return df
     @staticmethod
     def _gen_predict_prefix(item):
+        '''
+        根据候选词预测出用户实际想输入的词汇
+        '''
         prefix = item['prefix']
         query_prediction = item['query_prediction']
         if query_prediction == None:
@@ -487,7 +492,6 @@ class Process(object):
         max_str = prefix
         max_str_len = 0
         max_str_value = 0
-#         min_len = math.ceil(len(query_list)/2)
         for key, value in query_set.items():
             if value >= max_str_value:
                 if len(key) >= max_str_len:
@@ -497,6 +501,9 @@ class Process(object):
         return max_str
     @staticmethod
     def _gen_ctr_feat(df, train_len):
+        '''
+        对所有的特征做聚类，然后获取到他们对应的转化率
+        '''
         ctr_df = df[['prefix','title','tag','label']]
         train_data = ctr_df[:train_len]
         item_list = [['prefix', 'title', 'tag'], ['prefix', 'title'], ['prefix', 'tag'], ['title', 'tag'],["prefix"], ["title"], ["tag"]]
@@ -509,23 +516,18 @@ class Process(object):
 
             temp = train_data.groupby(item, as_index = False)['label'].agg({click_str:'sum', count_str:'count'})
             temp[ctr_str] = temp[click_str]/(temp[count_str] + 5)
-#             temp[ctr_str+'_log'] = np.log1p(temp[ctr_str])
-#             temp[click_str+'_log'] = np.log1p(temp[click_str])
-#             temp[count_str+'_log'] = np.log1p(temp[count_str])
 
-#             save_columns.extend([ctr_str,ctr_str+'_log',click_str,click_str+'_log',count_str,count_str+'_log'])
             save_columns.extend([ctr_str,click_str,count_str])
 
             ctr_df = pd.merge(ctr_df, temp, on=item, how='left')
             temp.drop(item,axis=1, inplace=True)
-#             for col in temp.columns:
-#                 ctr_df[col].fillna(temp[col].mean(), inplace=True)
+
         ctr_df[save_columns].to_csv('./cache/df_ctr_new.csv')
         return ctr_df[save_columns]
 
     def _get_w2v(self, data, col, size=300):
         '''
-        得到所需要特征的词向量
+        得到当前data中的col列的词向量
         '''
         file_name = './cache/{col}_w2v_df.csv'.format(col=col)
         columns = ['{}_w2v_{}'.format(col, i) for i in range(size)]
@@ -539,6 +541,7 @@ class Process(object):
                 elif not item:
                     item_list = [''] * size
                 else:
+                    #分词后做词汇的清洗
                     seg_cut = jieba.lcut(item)
                     seg_cut = char_list_cheaner(seg_cut)
 
@@ -558,6 +561,9 @@ class Process(object):
                 f.write(','.join(map(str, item_list)) + '\n')
 
     def gen_feat(self):
+        '''
+        根据以上的代码得到所有的特征
+        '''
         train_data = self._get_data(name='train')
         vali_data = self._get_data(name='vali')
         test_data = self._get_data(name='test')
@@ -572,6 +578,7 @@ class Process(object):
 
         df = pd.concat([train_data, vali_data, test_data], axis=0, ignore_index=True)
         
+        #把预测的prefix替换成当前的prefix
         df['prefix'] = df.apply(self._gen_predict_prefix, axis=1)
         #CTR
         print('gen ctr')
@@ -605,13 +612,17 @@ class Process(object):
         df = pd.concat([df,query_df],axis=1)
         del query_df
         
+        #去掉一些不用的数据
         df = df.drop(['prefix', 'query_prediction', 'title', 'tag'], axis = 1)
         
+        #对所有的列做平均值填充并计算log特征
         for col in df.columns:
             df[col].fillna(df[col].mean(), inplace=True)
         for col in df.columns:
             log_str = col + '_log'
             df[log_str] = np.log1p(df[col])
+
+        #分割并保存数据
         train_data = df[:train_len]
         vali_data = df[train_len:train_len+vali_len]
         test_data = df[train_len+vali_len:train_len+vali_len+test_len]
